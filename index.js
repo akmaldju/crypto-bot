@@ -9,7 +9,7 @@ const bot = new TeleBot({
 // bot.on('text', (msg) => msg.reply.text(msg.text));
 bot.on(['/start', '/hello'], (msg) => msg.reply.text('Welcome to my cryptocurrency trading helper!'));
 
-bot.on(['/subscribeBtc'], async (msg) => {
+bot.on(['/subscribebtc'], async (msg) => {
     const id = msg.from.id;
     let response = await getTokenPrice('bitcoin');
 
