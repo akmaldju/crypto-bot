@@ -9,13 +9,16 @@ const bot = new TeleBot({
 // bot.on('text', (msg) => msg.reply.text(msg.text));
 bot.on(['/start', '/hello'], (msg) => msg.reply.text('Welcome to my cryptocurrency trading helper!'));
 
-bot.on(['/subscribeBtc'], (msg) => {
+bot.on(['/subscribeBtc'], async (msg) => {
     const id = msg.from.id;
+    let response = await getTokenPrice('bitcoin');
+
+    msg.reply.text(response.err_msg || `The price of Bitcoin (BTC) is ${formatPrice(response.data.market_data.current_price.usd)}`);
 
     setInterval(async () => {
-        const response = await getTokenPrice('bitcoin');
+        response = await getTokenPrice('bitcoin');
 
-        msg.reply.text(response.err_msg || `Current Bitcon price is: ${formatPrice(response.data.market_data.current_price.usd)}`);
+        msg.reply.text(response.err_msg || `The price of Bitcoin (BTC) is ${formatPrice(response.data.market_data.current_price.usd)}`);
     }, 1000 * 60 * 60);
 
     return;
@@ -56,8 +59,12 @@ bot.on(['/research'], async (msg) => {
 
     // console.log(response);
     await msg.reply.photo(response.data.image?.large);
-    await msg.reply.text(response.data.description?.en);
-    await msg.reply.text(response.err_msg || formatTokenInfo(response));
+    try {
+        await msg.reply.text(response.data.description?.en);
+    } catch (error) {
+        console.log(error);
+    }
+    await msg.reply.text(formatTokenInfo(response));
     await msg.reply.text(formatTokenSocials(response));
 
     return;
@@ -70,7 +77,11 @@ bot.on('ask.token_info', async (msg) => {
     if (response.err_msg) return msg.reply.text(response.err_msg);
 
     await msg.reply.photo(response.data.image?.large);
-    await msg.reply.text(response.data.description?.en);
+    try {
+        await msg.reply.text(response.data.description?.en);
+    } catch (error) {
+        console.log(error);
+    }
     await msg.reply.text(formatTokenInfo(response));
     await msg.reply.text(formatTokenSocials(response));
     return;
