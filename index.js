@@ -24,7 +24,6 @@ bot.on(['/subscribeBtc'], (msg) => {
 bot.on(['/price'], async (msg) => {
     const formatted_msg = msg.text.split(' ')[1]?.toLowerCase();
     const id = msg.from.id;
-    // console.warn(formatted_msg);
 
     if (!formatted_msg) {
         return bot.sendMessage(id, 'Which token would you like to me check?', { ask: 'token_price' });
@@ -32,7 +31,6 @@ bot.on(['/price'], async (msg) => {
 
     const response = await getTokenPrice(formatted_msg);
 
-    // console.log(response);
     return msg.reply.text(response.err_msg || formatPrice(response.data.market_data.current_price.usd));
 });
 
