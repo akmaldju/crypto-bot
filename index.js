@@ -24,12 +24,32 @@ bot.on(['/subscribebtc'], async (msg) => {
     return;
 });
 
+bot.on(['/search'], async (msg) => {
+    const formatted_msg = msg.text.split(' ')[1]?.toLowerCase();
+    const id = msg.from.id;
+
+    if (!formatted_msg) {
+        return bot.sendMessage(id, 'Which token would you like me to check?', { ask: 'search' });
+    }
+
+    const response = await searchTokenIdByName(formatted_msg);
+
+    return giveSearchSuggestions(response.data.coins, msg);
+});
+
+bot.on('ask.search', async (msg) => {
+    const token = msg.text.toLowerCase();
+    const response = await searchTokenIdByName(token);
+
+    return giveSearchSuggestions(response.data.coins, msg);
+});
+
 bot.on(['/price'], async (msg) => {
     const formatted_msg = msg.text.split(' ')[1]?.toLowerCase();
     const id = msg.from.id;
 
     if (!formatted_msg) {
-        return bot.sendMessage(id, 'Which token would you like to me check?', { ask: 'token_price' });
+        return bot.sendMessage(id, 'Which token would you like me to check?', { ask: 'token_price' });
     }
 
     const response = await getTokenPrice(formatted_msg);
@@ -50,14 +70,13 @@ bot.on(['/research'], async (msg) => {
     // console.warn(formatted_msg);
 
     if (!formatted_msg) {
-        return bot.sendMessage(id, 'Which token would you like to me check?', { ask: 'token_info' });
+        return bot.sendMessage(id, 'Which token would you like me to check?', { ask: 'token_info' });
     }
 
-    const response = await getTokenInfo(formatted_msg);
+    const response = await getTokenInfo(formatted_msg, msg);
 
     if (response.err_msg) return msg.reply.text(response.err_msg);
 
-    // console.log(response);
     await msg.reply.photo(response.data.image?.large);
     try {
         await msg.reply.text(response.data.description?.en);
@@ -72,7 +91,7 @@ bot.on(['/research'], async (msg) => {
 
 bot.on('ask.token_info', async (msg) => {
     const token = msg.text.toLowerCase();
-    const response = await getTokenInfo(token);
+    const response = await getTokenInfo(token, msg);
 
     if (response.err_msg) return msg.reply.text(response.err_msg);
 
@@ -93,10 +112,10 @@ bot.on(['/contract'], async (msg) => {
     // console.warn(formatted_msg);
 
     if (!formatted_msg) {
-        return bot.sendMessage(id, 'Which token would you like to me check?', { ask: 'contract' });
+        return bot.sendMessage(id, 'Which token would you like me to check?', { ask: 'contract' });
     }
 
-    const response = await getTokenInfo(formatted_msg);
+    const response = await getTokenInfo(formatted_msg, msg);
 
     // console.log(response);
     return msg.reply.text(response.err_msg || response.data.contract_address);
@@ -104,9 +123,16 @@ bot.on(['/contract'], async (msg) => {
 
 bot.on('ask.contract', async (msg) => {
     const token = msg.text.toLowerCase();
-    const response = await getTokenInfo(token);
+    const response = await getTokenInfo(token, msg);
 
     return msg.reply.text(response.err_msg || response.data.contract_address);
+});
+
+bot.on(['/trending'], async (msg) => {
+    const id = msg.from.id;
+    const response = await getTrendingTokens();
+
+    return msg.reply.text(response.err_msg || formatTrendingTokens(response));
 });
 
 // bot.on(/(show\s)?kitty*/, (msg) => {
@@ -174,6 +200,18 @@ Github: ${data.links.repos_url.github[0]}
     `;
 }
 
+const formatTrendingTokens = (response) => {
+    const data = response.data.coins;
+    let reply_string = 'Most Popular Coins Today: \n';
+
+    for (let i = 0; i < data.length; i++) {
+        const element = data[i];
+        reply_string = reply_string.concat(`${i + 1}: ${element.item.name} (${element.item.symbol})\n`)
+    }
+
+    return reply_string;
+}
+
 const getTokenPrice = async (token) => {
     let response = '';
 
@@ -195,7 +233,7 @@ const getTokenPrice = async (token) => {
     return response;
 }
 
-const getTokenInfo = async (token) => {
+const getTokenInfo = async (token, msg) => {
     let response = '';
 
     try {
@@ -210,7 +248,64 @@ const getTokenInfo = async (token) => {
             },
         });
     } catch (error) {
-        return { err_msg: 'This token was not found.' };
+        response = await searchTokenIdByName(token);
+        return giveSearchSuggestions(response.data.coins, msg);
+        // return { err_msg: 'This token was not found.' };
+    }
+
+    return response;
+}
+
+const searchTokenIdByName = async (token) => {
+    let response = '';
+
+    try {
+        response = await axios({
+            'method': 'GET',
+            'url': `https://api.coingecko.com/api/v3/search`,
+            'headers': {
+                'content-type': 'application/json',
+            },
+            'params': {
+                'query': token,
+            },
+        });
+    } catch (error) {
+        return { err_msg: 'Nothing was found.' };
+    }
+
+    return response;
+}
+
+const giveSearchSuggestions = (coins, msg) => {
+    let coin_options = [];
+    let replyMarkup;
+
+    if (coins.length === 0)
+        return bot.sendMessage(msg.from.id, 'Nothing was found :-(', { replyMarkup: 'hide' });
+
+    coins.forEach(coin => {
+        coin_options.push(['/research ' + coin.id]);
+    });
+
+    replyMarkup = bot.keyboard(coin_options, { resize: true });
+
+    return bot.sendMessage(msg.from.id, 'Were you looking for any of these?', { replyMarkup });
+}
+
+const getTrendingTokens = async () => {
+    let response = '';
+
+    try {
+        response = await axios({
+            'method': 'GET',
+            'url': `https://api.coingecko.com/api/v3/search/trending`,
+            'headers': {
+                'content-type': 'application/json',
+            },
+        });
+    } catch (error) {
+        return { err_msg: 'Server Error. Try again later.' };
     }
 
     return response;
